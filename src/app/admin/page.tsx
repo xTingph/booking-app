@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '../../lib/supabaseClient'
@@ -23,11 +22,26 @@ function AdminDashboardContent() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState('')
   
+  // Custom Services States
+  const [services, setServices] = useState<any[]>([])
+  const [serviceName, setServiceName] = useState('')
+  const [serviceSlug, setServiceSlug] = useState('')
+  const [servicePrice, setServicePrice] = useState('2500')
+  const [serviceDays, setServiceDays] = useState('Monday to Friday')
+  const [startTime, setStartTime] = useState('08:00')
+  const [endTime, setEndTime] = useState('17:00')
+  
   const [currentDate, setCurrentDate] = useState<Date | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
   const ADMIN_USER_EMAIL = 'markandrewtubog@gmail.com'
+
+  // Fetch services on load
+  const fetchServices = async () => {
+    const { data } = await supabase.from('services').select('*').order('created_at', { ascending: false })
+    if (data) setServices(data)
+  }
 
   useEffect(() => {
     setCurrentDate(new Date()) // Set client-side date safely
@@ -48,6 +62,7 @@ function AdminDashboardContent() {
 
       setAdminEmail(user.email)
       fetchAllBookings()
+      fetchServices()
     }
 
     verifyAdminAndFetch()
@@ -81,6 +96,31 @@ function AdminDashboardContent() {
       setEditingNoteId(null)
     } else {
       alert('Failed to save note: ' + error.message)
+    }
+  }
+
+  const handleCreateService = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanSlug = serviceSlug.toLowerCase().replace(/\s+/g, '-')
+    
+    const { error } = await supabase.from('services').insert([
+      {
+        name: serviceName,
+        slug: cleanSlug,
+        price: parseFloat(servicePrice),
+        available_days: serviceDays,
+        start_time: startTime,
+        end_time: endTime
+      }
+    ])
+
+    if (!error) {
+      alert('Booking link created successfully!')
+      setServiceName('')
+      setServiceSlug('')
+      fetchServices()
+    } else {
+      alert('Error creating link: ' + error.message)
     }
   }
 
@@ -160,6 +200,118 @@ function AdminDashboardContent() {
         <div>
           <h1 className="text-2xl font-extrabold text-white">All Client Bookings & Workflow</h1>
           <p className="text-sm text-slate-400 mt-1">Manage schedules, track upcoming appointment deadlines, and set reminders.</p>
+        </div>
+
+        {/* Custom Booking Links Generator Section */}
+        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-6">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">🔗 Create Custom Booking URL & Schedule</h2>
+          
+          <form onSubmit={handleCreateService} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Booking Name</label>
+              <input
+                type="text"
+                placeholder="e.g. 1on1 Consultation"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">URL Slug</label>
+              <input
+                type="text"
+                placeholder="e.g. 1on1-booking"
+                value={serviceSlug}
+                onChange={(e) => setServiceSlug(e.target.value)}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Price (PHP)</label>
+              <input
+                type="number"
+                value={servicePrice}
+                onChange={(e) => setServicePrice(e.target.value)}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Available Days</label>
+              <input
+                type="text"
+                value={serviceDays}
+                onChange={(e) => setServiceDays(e.target.value)}
+                placeholder="Monday to Friday"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time - End Time</label>
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-1/2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none"
+                />
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-1/2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/30 transition"
+              >
+                + Generate Booking Link
+              </button>
+            </div>
+          </form>
+
+          {/* Active Links Table */}
+          {services.length > 0 && (
+            <div className="mt-6 border-t border-slate-700 pt-4">
+              <h3 className="text-sm font-bold text-slate-300 mb-3">Active Custom Booking URLs</h3>
+              <div className="space-y-2">
+                {services.map((s) => {
+                  const fullUrl = `${window.location.origin}/book/${s.slug}`
+                  return (
+                    <div key={s.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 gap-2">
+                      <div>
+                        <span className="font-bold text-white text-sm">{s.name}</span>
+                        <span className="block text-xs text-slate-400">🕒 {s.available_days} ({s.start_time} - {s.end_time}) | 💰 ₱{s.price}</span>
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <input
+                          type="text"
+                          readOnly
+                          value={fullUrl}
+                          className="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700 w-full sm:w-64"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(fullUrl)
+                            alert('Copied URL to clipboard!')
+                          }}
+                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-lg transition shrink-0"
+                        >
+                          Copy Link
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Urgent Deadlines Alert Banner */}

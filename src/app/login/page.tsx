@@ -19,12 +19,29 @@ export default function LoginPage() {
 
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setError(error.message)
-      else alert('Success! Check your email for the confirmation link.')
+      if (error) {
+        setError(error.message)
+      } else {
+        alert('Success! Check your email for the confirmation link.')
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
-      else router.push('/dashboard')
+      if (error) {
+        setError(error.message)
+      } else {
+        // Successful login: check if there's a pending booking to return to
+        const pending = localStorage.getItem('pendingBooking')
+        if (pending) {
+          try {
+            const parsed = JSON.parse(pending)
+            router.push(`/book/${parsed.slug}`)
+          } catch (e) {
+            router.push('/dashboard')
+          }
+        } else {
+          router.push('/dashboard')
+        }
+      }
     }
     setLoading(false)
   }
@@ -79,6 +96,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <button
+            type="button"
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-xs text-indigo-300 hover:text-white transition underline underline-offset-4"
           >

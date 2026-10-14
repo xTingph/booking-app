@@ -2,6 +2,7 @@
 import { createClient } from '../../lib/supabaseClient'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, useRef, Suspense } from 'react'
+import { createCalendarEvent } from '@/lib/googleCalendar'
 
 interface Booking {
   id: string
@@ -26,7 +27,7 @@ function DashboardContent() {
 
   const processedRef = useRef(false)
 
-useEffect(() => {
+  useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -55,7 +56,7 @@ useEffect(() => {
         // Clean the URL parameters right away
         router.replace('/dashboard')
 
-        // Save booking to Supabase
+        // 1. Save booking to Supabase
         const { error } = await supabase.from('bookings').insert([
           {
             user_id: user.id,
@@ -68,13 +69,22 @@ useEffect(() => {
         ])
 
         if (!error) {
-          alert('Payment successful! Your booking has been confirmed.')
+          // 2. Automatically create Google Calendar Event
+          await createCalendarEvent({
+            serviceName: paidService,
+            userEmail: user.email,
+            bookingDate: paidDate,
+            bookingTime: paidTime,
+          })
+
+          alert('Payment successful! Your booking has been confirmed and added to your calendar.')
           fetchBookings(user.id)
         } else {
           console.error('Error inserting booking:', error.message)
         }
       }
     }
+
     loadData()
   }, [router, supabase, searchParams])
 
