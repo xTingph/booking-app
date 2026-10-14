@@ -2,7 +2,6 @@
 import { createClient } from '../../lib/supabaseClient'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, useRef, Suspense } from 'react'
-import { createCalendarEvent } from '@/lib/googleCalendar'
 
 interface Booking {
   id: string
@@ -34,6 +33,8 @@ function DashboardContent() {
         router.push('/login')
         return
       }
+
+      const userEmail = user.email ?? ''
       setUser(user)
       fetchBookings(user.id)
 
@@ -60,7 +61,7 @@ function DashboardContent() {
         const { error } = await supabase.from('bookings').insert([
           {
             user_id: user.id,
-            user_email: user.email,
+            user_email: userEmail,
             service_name: paidService,
             booking_date: paidDate,
             booking_time: paidTime,
@@ -69,13 +70,21 @@ function DashboardContent() {
         ])
 
         if (!error) {
-          // 2. Automatically create Google Calendar Event
-          await createCalendarEvent({
-            serviceName: paidService,
-            userEmail: user.email,
-            bookingDate: paidDate,
-            bookingTime: paidTime,
-          })
+          // 2. Safely trigger Google Calendar event via server API
+          try {
+            await fetch('/api/calendar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                serviceName: paidService,
+                userEmail,
+                bookingDate: paidDate,
+                bookingTime: paidTime,
+              }),
+            })
+          } catch (calErr) {
+            console.error('Failed to trigger calendar event:', calErr)
+          }
 
           alert('Payment successful! Your booking has been confirmed and added to your calendar.')
           fetchBookings(user.id)
