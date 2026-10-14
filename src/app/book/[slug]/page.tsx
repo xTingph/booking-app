@@ -71,7 +71,7 @@ function PublicBookingContent() {
             localStorage.removeItem('pendingBooking')
             
             // Automatically redirect straight to payment page!
-            triggerCheckout(serviceData, parsed.selectedDate, parsed.bookingTime, user.email)
+            triggerCheckout(serviceData, parsed.selectedDate, parsed.bookingTime, user.email ?? '')
             return
           }
         } catch (e) {
@@ -126,7 +126,7 @@ function PublicBookingContent() {
     }
 
     // If already logged in, go straight to payment
-    triggerCheckout(service, selectedDate, bookingTime, user.email)
+    triggerCheckout(service, selectedDate, bookingTime, user.email ?? '')
   }
 
   if (loading || (submitting && localStorage.getItem('pendingBooking'))) {
