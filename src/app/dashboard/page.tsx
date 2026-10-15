@@ -51,10 +51,7 @@ function DashboardContent() {
         paidTime &&
         !processedRef.current
       ) {
-        // Mark as processed immediately so StrictMode/re-renders can't run it again
         processedRef.current = true
-
-        // Clean the URL parameters right away
         router.replace('/dashboard')
 
         // 1. Save booking to Supabase
@@ -70,7 +67,7 @@ function DashboardContent() {
         ])
 
         if (!error) {
-          // 2. Safely trigger Google Calendar event via server API
+          // 2. Automatically log the event to your Admin Google Calendar
           try {
             await fetch('/api/calendar', {
               method: 'POST',
@@ -80,13 +77,14 @@ function DashboardContent() {
                 userEmail,
                 bookingDate: paidDate,
                 bookingTime: paidTime,
+                price: '$50.00', // You can make this dynamic if needed
               }),
             })
           } catch (calErr) {
             console.error('Failed to trigger calendar event:', calErr)
           }
 
-          alert('Payment successful! Your booking has been confirmed and added to your calendar.')
+          alert('Payment successful! Your booking has been confirmed.')
           fetchBookings(user.id)
         } else {
           console.error('Error inserting booking:', error.message)
@@ -105,6 +103,36 @@ function DashboardContent() {
       .order('created_at', { ascending: false })
     
     if (data) setBookings(data)
+  }
+
+  // Helper to generate a 1-click Google Calendar Event URL for clients
+  const generateGoogleCalendarLink = (b: Booking) => {
+    const cleanTime = b.booking_time.trim().toUpperCase()
+    let hours = 10, minutes = 0
+    if (cleanTime.includes('AM') || cleanTime.includes('PM')) {
+      const [timePart, modifier] = cleanTime.split(' ')
+      let [h, m] = timePart.split(':').map(Number)
+      if (modifier === 'PM' && h < 12) h += 12
+      if (modifier === 'AM' && h === 12) h = 0
+      hours = h
+      minutes = m || 0
+    } else {
+      const [h, m] = cleanTime.split(':').map(Number)
+      hours = h || 0
+      minutes = m || 0
+    }
+
+    const startDate = new Date(b.booking_date)
+    startDate.setHours(hours, minutes, 0, 0)
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // 1 hour duration
+
+    const formatIso = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, '')
+
+    const text = encodeURIComponent(`[Booked] ${b.service_name}`)
+    const details = encodeURIComponent(`Confirmed booking via Client Portal.\nService: ${b.service_name}`)
+    const dates = `${formatIso(startDate)}/${formatIso(endDate)}`
+
+    return `https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}`
   }
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -127,7 +155,7 @@ function DashboardContent() {
 
       const data = await res.json()
       if (data.url) {
-        window.location.href = data.url // Redirect to Stripe Checkout
+        window.location.href = data.url
       } else {
         alert('Error initiating checkout: ' + (data.error || 'Unknown error'))
         setLoading(false)
@@ -239,9 +267,19 @@ function DashboardContent() {
                       <h3 className="font-bold text-slate-800 text-base">{b.service_name}</h3>
                       <p className="text-xs text-slate-500 mt-0.5">📅 {b.booking_date} at 🕒 {b.booking_time}</p>
                     </div>
-                    <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold capitalize w-fit">
-                      {b.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold capitalize w-fit">
+                        {b.status}
+                      </span>
+                      <a
+                        href={generateGoogleCalendarLink(b)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition shadow-xs flex items-center gap-1.5"
+                      >
+                        📅 Add to Calendar
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
